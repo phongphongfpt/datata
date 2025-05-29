@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theo dõi Dự án Phần mềm (PouchDB)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            background-color: #e5e7eb;
+            color: #4b5563;
+        }
+        .tab-button.active {
+            background-color: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+        }
+        .tab-button:hover:not(.active) {
+            background-color: #d1d5db;
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.75rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #333;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.5) sepia(1) saturate(5) hue-rotate(175deg); /* Makes calendar icon more visible */
+        }
+        /* Status colors */
+        .status-todo { background-color: #fcd34d; color: #92400e; } /* Amber */
+        .status-in-progress { background-color: #60a5fa; color: #1e40af; } /* Blue */
+        .status-on-hold { background-color: #9ca3af; color: #374151; } /* Gray */
+        .status-review { background-color: #a78bfa; color: #5b21b6; } /* Purple */
+        .status-done { background-color: #34d399; color: #065f46; } /* Green */
+        .status-blocked { background-color: #ef4444; color: #991b1b; } /* Red */
+
+        /* Priority colors */
+        .priority-critical { background-color: #f87171; color: #7f1d1d; } /* Red-ish */
+        .priority-high { background-color: #fbbf24; color: #92400e; } /* Orange-ish */
+        .priority-medium { background-color: #60a5fa; color: #1e40af; } /* Blue-ish */
+        .priority-low { background-color: #a78bfa; color: #5b21b6; } /* Purple-ish */
+
+        /* Table styling */
+        .table-header th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            background-color: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+            color: #4b5563;
+        }
+        .table-row td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        .table-row:last-child td {
+            border-bottom: none;
+        }
+        .table-row:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">Theo dõi Dự án Phần mềm</h1>
+
+        <div class="flex justify-center space-x-4 mb-8">
+            <button id="dashboardTabBtn" class="tab-button active">Tổng quan</button>
+            <button id="tasksTabBtn" class="tab-button">Công việc</button>
+            <button id="teamTabBtn" class="tab-button">Đội ngũ</button>
+            <button id="issuesTabBtn" class="tab-button">Vấn đề/Rủi ro</button>
+        </div>
+
+        <div id="dashboardSection" class="tab-content">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700">Tổng quan Dự án</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-blue-100 p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <p class="text-lg font-medium text-blue-800">Tổng số công việc</p>
+                    <p id="totalTasks" class="text-4xl font-bold text-blue-900 mt-2">0</p>
+                </div>
+                <div class="bg-yellow-100 p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <p class="text-lg font-medium text-yellow-800">Cần làm</p>
+                    <p id="todoTasks" class="text-4xl font-bold text-yellow-900 mt-2">0</p>
+                </div>
+                <div class="bg-indigo-100 p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <p class="text-lg font-medium text-indigo-800">Đang thực hiện</p>
+                    <p id="inProgressTasks" class="text-4xl font-bold text-indigo-900 mt-2">0</p>
+                </div>
+                <div class="bg-green-100 p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <p class="text-lg font-medium text-green-800">Đã hoàn thành</p>
+                    <p id="doneTasks" class="text-4xl font-bold text-green-900 mt-2">0</p>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-semibold mb-4 text-gray-700">Tóm tắt Vấn đề/Rủi ro đang mở</h3>
+            <div id="openIssuesSummary" class="bg-gray-50 p-4 rounded-lg shadow-inner">
+                <p class="text-gray-600">Không có vấn đề/rủi ro đang mở.</p>
+            </div>
+        </div>
+
+        <div id="tasksSection" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-700">Quản lý Công việc</h2>
+                <div class="flex space-x-2">
+                    <button id="exportTasksBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        Xuất ra CSV
+                    </button>
+                    <button id="addTaskBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        + Thêm Công việc
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr class="table-header">
+                            <th>ID</th>
+                            <th>Tên Công việc</th>
+                            <th>Người phụ trách</th>
+                            <th>Trạng thái</th>
+                            <th>Ưu tiên</th>
+                            <th>Ngày bắt đầu</th>
+                            <th>Ngày đến hạn</th>
+                            <th>Tiến độ (%)</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksTableBody">
+                        </tbody>
+                </table>
+                <div id="noTasksMessage" class="text-center py-8 text-gray-500 hidden">
+                    Chưa có công việc nào. Hãy thêm một công việc mới!
+                </div>
+            </div>
+        </div>
+
+        <div id="teamSection" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-700">Quản lý Đội ngũ</h2>
+                <div class="flex space-x-2">
+                    <button id="exportTeamBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        Xuất ra CSV
+                    </button>
+                    <button id="addTeamMemberBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        + Thêm Thành viên
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr class="table-header">
+                            <th>ID Thành viên</th>
+                            <th>Tên</th>
+                            <th>Vai trò</th>
+                            <th>Email</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teamTableBody">
+                        </tbody>
+                </table>
+                <div id="noTeamMembersMessage" class="text-center py-8 text-gray-500 hidden">
+                    Chưa có thành viên nào. Hãy thêm một thành viên mới!
+                </div>
+            </div>
+        </div>
+
+        <div id="issuesSection" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-700">Quản lý Vấn đề & Rủi ro</h2>
+                <div class="flex space-x-2">
+                    <button id="exportIssuesBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        Xuất ra CSV
+                    </button>
+                    <button id="addIssueBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">
+                        + Thêm Vấn đề/Rủi ro
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr class="table-header">
+                            <th>ID</th>
+                            <th>Loại</th>
+                            <th>Mô tả</th>
+                            <th>Trạng thái</th>
+                            <th>Mức độ</th>
+                            <th>Người phụ trách</th>
+                            <th>Ngày báo cáo</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="issuesTableBody">
+                        </tbody>
+                </table>
+                <div id="noIssuesMessage" class="text-center py-8 text-gray-500 hidden">
+                    Chưa có vấn đề/rủi ro nào. Hãy thêm một mục mới!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('taskModal')">&times;</span>
+            <h3 id="taskModalTitle" class="text-2xl font-bold mb-6 text-gray-800">Thêm Công việc Mới</h3>
+            <form id="taskForm" class="space-y-4">
+                <input type="hidden" id="taskId">
+                <div>
+                    <label for="taskName" class="block text-sm font-medium text-gray-700">Tên Công việc</label>
+                    <input type="text" id="taskName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="taskDescription" class="block text-sm font-medium text-gray-700">Mô tả</label>
+                    <textarea id="taskDescription" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="taskPriority" class="block text-sm font-medium text-gray-700">Ưu tiên</label>
+                        <select id="taskPriority" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="Low">Thấp</option>
+                            <option value="Medium" selected>Trung bình</option>
+                            <option value="High">Cao</option>
+                            <option value="Critical">Nghiêm trọng</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="taskStatus" class="block text-sm font-medium text-gray-700">Trạng thái</label>
+                        <select id="taskStatus" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="To Do">Cần làm</option>
+                            <option value="In Progress">Đang thực hiện</option>
+                            <option value="On Hold">Tạm dừng</option>
+                            <option value="Review">Đang xem xét</option>
+                            <option value="Done">Đã hoàn thành</option>
+                            <option value="Blocked">Bị chặn</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="taskAssignedTo" class="block text-sm font-medium text-gray-700">Người phụ trách</label>
+                    <select id="taskAssignedTo" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Chọn người phụ trách</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="taskStartDate" class="block text-sm font-medium text-gray-700">Ngày bắt đầu</label>
+                        <input type="date" id="taskStartDate" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="taskDueDate" class="block text-sm font-medium text-gray-700">Ngày đến hạn</label>
+                        <input type="date" id="taskDueDate" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="taskEstimatedHours" class="block text-sm font-medium text-gray-700">Giờ ước tính</label>
+                        <input type="number" id="taskEstimatedHours" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" min="0" step="0.5">
+                    </div>
+                    <div>
+                        <label for="taskActualHours" class="block text-sm font-medium text-gray-700">Giờ thực tế</label>
+                        <input type="number" id="taskActualHours" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" min="0" step="0.5">
+                    </div>
+                </div>
+                <div>
+                    <label for="taskProgress" class="block text-sm font-medium text-gray-700">Tiến độ (%)</label>
+                    <input type="number" id="taskProgress" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" min="0" max="100" step="1">
+                </div>
+                <div>
+                    <label for="taskParentId" class="block text-sm font-medium text-gray-700">ID Công việc cha (nếu có)</label>
+                    <input type="text" id="taskParentId" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="taskDependencies" class="block text-sm font-medium text-gray-700">Phụ thuộc vào (Task IDs, cách nhau bằng dấu phẩy)</label>
+                    <input type="text" id="taskDependencies" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="taskLink" class="block text-sm font-medium text-gray-700">Liên kết tài liệu</label>
+                    <input type="url" id="taskLink" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">Lưu Công việc</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="teamModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('teamModal')">&times;</span>
+            <h3 id="teamModalTitle" class="text-2xl font-bold mb-6 text-gray-800">Thêm Thành viên Mới</h3>
+            <form id="teamForm" class="space-y-4">
+                <input type="hidden" id="memberId">
+                <div>
+                    <label for="memberName" class="block text-sm font-medium text-gray-700">Tên</label>
+                    <input type="text" id="memberName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="memberRole" class="block text-sm font-medium text-gray-700">Vai trò</label>
+                    <input type="text" id="memberRole" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="memberEmail" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="memberEmail" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">Lưu Thành viên</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="issueModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('issueModal')">&times;</span>
+            <h3 id="issueModalTitle" class="text-2xl font-bold mb-6 text-gray-800">Thêm Vấn đề/Rủi ro Mới</h3>
+            <form id="issueForm" class="space-y-4">
+                <input type="hidden" id="issueId">
+                <div>
+                    <label for="issueType" class="block text-sm font-medium text-gray-700">Loại</label>
+                    <select id="issueType" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="Issue">Vấn đề</option>
+                        <option value="Risk">Rủi ro</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issueDescription" class="block text-sm font-medium text-gray-700">Mô tả</label>
+                    <textarea id="issueDescription" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" required></textarea>
+                </div>
+                <div>
+                    <label for="issueStatus" class="block text-sm font-medium text-gray-700">Trạng thái</label>
+                    <select id="issueStatus" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="Open">Mở</option>
+                        <option value="In Progress">Đang xử lý</option>
+                        <option value="Resolved">Đã giải quyết</option>
+                        <option value="Closed">Đã đóng</option>
+                        <option value="Mitigated">Đã giảm thiểu</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issueSeverity" class="block text-sm font-medium text-gray-700">Mức độ nghiêm trọng/tác động</label>
+                    <select id="issueSeverity" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="Low">Thấp</option>
+                        <option value="Medium" selected>Trung bình</option>
+                        <option value="High">Cao</option>
+                        <option value="Critical">Nghiêm trọng</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issueAssignedTo" class="block text-sm font-medium text-gray-700">Người phụ trách</label>
+                    <select id="issueAssignedTo" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Chọn người phụ trách</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issueDateReported" class="block text-sm font-medium text-gray-700">Ngày báo cáo</label>
+                    <input type="date" id="issueDateReported" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="issueResolution" class="block text-sm font-medium text-gray-700">Kế hoạch giải quyết/giảm thiểu</label>
+                    <textarea id="issueResolution" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-105">Lưu Vấn đề/Rủi ro</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="messageBox" class="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg hidden z-[1001]">
+        <p id="messageText"></p>
+        <button class="ml-4 text-sm font-bold opacity-75 hover:opacity-100" onclick="hideMessageBox()">Đóng</button>
+    </div>
+
+    <script>
+        // Global project data object - now populated from PouchDB
+        let projectData = {
+            tasks: [],
+            team: [],
+            issues: []
+        };
+
+        // Initialize PouchDB databases
+        // Each database will store documents for its respective type
+        const db_tasks = new PouchDB('project_tasks');
+        const db_team = new PouchDB('project_team');
+        const db_issues = new PouchDB('project_issues');
+
+        // --- Utility Functions ---
+
+        /**
+         * Generates a unique ID for new items, suitable for PouchDB's _id.
+         * @param {string} prefix - Prefix for the ID (e.g., 'T-', 'M-', 'I-').
+         * @returns {string} Unique ID.
+         */
+        function generateUniqueId(prefix) {
+            return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5).toUpperCase();
+        }
+
+        /**
+         * Displays a message box.
+         * @param {string} message - The message to display.
+         * @param {number} duration - Duration in milliseconds before hiding (0 for indefinite).
+         */
+        function showMessageBox(message, duration = 3000) {
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            if (duration > 0) {
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                }, duration);
+            }
+        }
+
+        /**
+         * Hides the message box.
+         */
+        function hideMessageBox() {
+            document.getElementById('messageBox').classList.add('hidden');
+        }
+
+        /**
+         * Opens a modal.
+         * @param {string} modalId - The ID of the modal to open.
+         */
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'flex';
+        }
+
+        /**
+         * Closes a modal.
+         * @param {string} modalId - The ID of the modal to close.
+         */
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            // Reset forms when closing modals
+            if (modalId === 'taskModal') {
+                document.getElementById('taskForm').reset();
+                document.getElementById('taskId').value = ''; // Clear hidden ID
+                document.getElementById('taskModalTitle').textContent = 'Thêm Công việc Mới';
+            } else if (modalId === 'teamModal') {
+                document.getElementById('teamForm').reset();
+                document.getElementById('memberId').value = ''; // Clear hidden ID
+                document.getElementById('teamModalTitle').textContent = 'Thêm Thành viên Mới';
+            } else if (modalId === 'issueModal') {
+                document.getElementById('issueForm').reset();
+                document.getElementById('issueId').value = ''; // Clear hidden ID
+                document.getElementById('issueModalTitle').textContent = 'Thêm Vấn đề/Rủi ro Mới';
+            }
+        }
+
+        // --- Tab Management ---
+
+        /**
+         * Switches between different sections (tabs).
+         * @param {string} sectionId - The ID of the section to show.
+         */
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.tab-content').forEach(section => {
+                section.classList.add('hidden');
+            });
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Show the selected section
+            document.getElementById(sectionId).classList.remove('hidden');
+            // Activate the corresponding tab button
+            document.getElementById(sectionId.replace('Section', 'TabBtn')).classList.add('active');
+
+            // Re-render content for the active tab (data is loaded on initial load)
+            if (sectionId === 'tasksSection') {
+                renderTasks();
+            } else if (sectionId === 'teamSection') {
+                renderTeamMembers();
+            } else if (sectionId === 'issuesSection') {
+                renderIssues();
+            } else if (sectionId === 'dashboardSection') {
+                updateDashboard();
+            }
+        }
+
+        // --- Task Management ---
+
+        /**
+         * Renders tasks into the tasks table.
+         */
+        function renderTasks() {
+            const tableBody = document.getElementById('tasksTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            const noTasksMessage = document.getElementById('noTasksMessage');
+
+            if (projectData.tasks.length === 0) {
+                noTasksMessage.classList.remove('hidden');
+                return;
+            } else {
+                noTasksMessage.classList.add('hidden');
+            }
+
+            projectData.tasks.forEach(task => {
+                const row = document.createElement('tr');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <td class="font-semibold">${task._id}</td>
+                    <td>${task.name}</td>
+                    <td>${task.assignedTo || 'Chưa gán'}</td>
+                    <td><span class="px-2 py-1 rounded-full text-xs font-medium status-${task.status.toLowerCase().replace(/\s/g, '-') || 'todo'}">${task.status}</span></td>
+                    <td><span class="px-2 py-1 rounded-full text-xs font-medium priority-${task.priority.toLowerCase() || 'medium'}">${task.priority}</span></td>
+                    <td>${task.startDate || 'N/A'}</td>
+                    <td>${task.dueDate || 'N/A'}</td>
+                    <td><div class="w-24 bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${task.progress || 0}%"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">${task.progress || 0}%</span>
+                    </td>
+                    <td class="flex space-x-2">
+                        <button onclick="editTask('${task._id}')" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">Sửa</button>
+                        <button onclick="deleteTask('${task._id}')" class="text-red-600 hover:text-red-900 text-sm font-medium">Xóa</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        /**
+         * Handles adding or updating a task using PouchDB.
+         * @param {Event} event - The form submission event.
+         */
+        async function handleTaskFormSubmit(event) {
+            event.preventDefault();
+
+            const taskId = document.getElementById('taskId').value; // This is _id for PouchDB
+            const taskName = document.getElementById('taskName').value;
+            const taskDescription = document.getElementById('taskDescription').value;
+            const taskPriority = document.getElementById('taskPriority').value;
+            const taskStatus = document.getElementById('taskStatus').value;
+            const taskAssignedTo = document.getElementById('taskAssignedTo').value;
+            const taskStartDate = document.getElementById('taskStartDate').value;
+            const taskDueDate = document.getElementById('taskDueDate').value;
+            const taskEstimatedHours = parseFloat(document.getElementById('taskEstimatedHours').value) || 0;
+            const taskActualHours = parseFloat(document.getElementById('taskActualHours').value) || 0;
+            const taskProgress = parseFloat(document.getElementById('taskProgress').value) || 0;
+            const taskParentId = document.getElementById('taskParentId').value;
+            const taskDependencies = document.getElementById('taskDependencies').value.split(',').map(d => d.trim()).filter(d => d);
+            const taskLink = document.getElementById('taskLink').value;
+
+            try {
+                if (taskId) {
+                    // Update existing task
+                    const doc = await db_tasks.get(taskId); // Get document including _rev
+                    const updatedTask = {
+                        _id: doc._id,
+                        _rev: doc._rev, // Crucial for updates
+                        name: taskName,
+                        description: taskDescription,
+                        priority: taskPriority,
+                        status: taskStatus,
+                        assignedTo: taskAssignedTo,
+                        startDate: taskStartDate,
+                        dueDate: taskDueDate,
+                        estimatedHours: taskEstimatedHours,
+                        actualHours: taskActualHours,
+                        progress: taskProgress,
+                        parentId: taskParentId,
+                        dependencies: taskDependencies,
+                        link: taskLink
+                    };
+                    await db_tasks.put(updatedTask);
+                    showMessageBox('Công việc đã được cập nhật thành công!');
+                } else {
+                    // Add new task
+                    const newTask = {
+                        _id: generateUniqueId('T-'), // PouchDB _id
+                        name: taskName,
+                        description: taskDescription,
+                        priority: taskPriority,
+                        status: taskStatus,
+                        assignedTo: taskAssignedTo,
+                        startDate: taskStartDate,
+                        dueDate: taskDueDate,
+                        estimatedHours: taskEstimatedHours,
+                        actualHours: taskActualHours,
+                        progress: taskProgress,
+                        parentId: taskParentId,
+                        dependencies: taskDependencies,
+                        link: taskLink
+                    };
+                    await db_tasks.put(newTask);
+                    showMessageBox('Công việc mới đã được thêm thành công!');
+                }
+                await loadTasksFromPouchDB(); // Reload all tasks after modify
+                closeModal('taskModal');
+            } catch (err) {
+                console.error('Lỗi khi lưu công việc:', err);
+                showMessageBox('Lỗi khi lưu công việc. Vui lòng kiểm tra console.');
+            }
+        }
+
+        /**
+         * Populates the task modal with existing task data for editing.
+         * @param {string} id - The _id of the task to edit.
+         */
+        async function editTask(id) {
+            try {
+                const task = await db_tasks.get(id); // Get task from PouchDB
+                document.getElementById('taskModalTitle').textContent = 'Sửa Công việc';
+                document.getElementById('taskId').value = task._id;
+                document.getElementById('taskName').value = task.name;
+                document.getElementById('taskDescription').value = task.description;
+                document.getElementById('taskPriority').value = task.priority;
+                document.getElementById('taskStatus').value = task.status;
+                document.getElementById('taskAssignedTo').value = task.assignedTo;
+                document.getElementById('taskStartDate').value = task.startDate;
+                document.getElementById('taskDueDate').value = task.dueDate;
+                document.getElementById('taskEstimatedHours').value = task.estimatedHours;
+                document.getElementById('taskActualHours').value = task.actualHours;
+                document.getElementById('taskProgress').value = task.progress;
+                document.getElementById('taskParentId').value = task.parentId;
+                document.getElementById('taskDependencies').value = task.dependencies.join(', ');
+                document.getElementById('taskLink').value = task.link;
+                populateAssignedToDropdown('taskAssignedTo'); // Ensure dropdown is populated before setting value
+                openModal('taskModal');
+            } catch (err) {
+                console.error('Lỗi khi tải công việc để sửa:', err);
+                showMessageBox('Không thể tải công việc để sửa.');
+            }
+        }
+
+        /**
+         * Deletes a task using PouchDB.
+         * @param {string} id - The _id of the task to delete.
+         */
+        async function deleteTask(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa công việc này không?')) {
+                try {
+                    const doc = await db_tasks.get(id); // Get document with _rev
+                    await db_tasks.remove(doc);
+                    showMessageBox('Công việc đã được xóa.');
+                    await loadTasksFromPouchDB(); // Reload all tasks after delete
+                } catch (err) {
+                    console.error('Lỗi khi xóa công việc:', err);
+                    showMessageBox('Lỗi khi xóa công việc.');
+                }
+            }
+        }
+
+        // --- Team Management ---
+
+        /**
+         * Renders team members into the team table.
+         */
+        function renderTeamMembers() {
+            const tableBody = document.getElementById('teamTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            const noTeamMembersMessage = document.getElementById('noTeamMembersMessage');
+
+            if (projectData.team.length === 0) {
+                noTeamMembersMessage.classList.remove('hidden');
+                return;
+            } else {
+                noTeamMembersMessage.classList.add('hidden');
+            }
+
+            projectData.team.forEach(member => {
+                const row = document.createElement('tr');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <td class="font-semibold">${member._id}</td>
+                    <td>${member.name}</td>
+                    <td>${member.role}</td>
+                    <td>${member.email || 'N/A'}</td>
+                    <td class="flex space-x-2">
+                        <button onclick="editTeamMember('${member._id}')" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">Sửa</button>
+                        <button onclick="deleteTeamMember('${member._id}')" class="text-red-600 hover:text-red-900 text-sm font-medium">Xóa</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            // After rendering team members, update all 'Assigned To' dropdowns
+            populateAssignedToDropdown('taskAssignedTo');
+            populateAssignedToDropdown('issueAssignedTo');
+        }
+
+        /**
+         * Handles adding or updating a team member using PouchDB.
+         * @param {Event} event - The form submission event.
+         */
+        async function handleTeamFormSubmit(event) {
+            event.preventDefault();
+
+            const memberId = document.getElementById('memberId').value; // This is _id for PouchDB
+            const memberName = document.getElementById('memberName').value;
+            const memberRole = document.getElementById('memberRole').value;
+            const memberEmail = document.getElementById('memberEmail').value;
+
+            try {
+                if (memberId) {
+                    // Update existing member
+                    const doc = await db_team.get(memberId);
+                    const updatedMember = {
+                        _id: doc._id,
+                        _rev: doc._rev,
+                        name: memberName,
+                        role: memberRole,
+                        email: memberEmail
+                    };
+                    await db_team.put(updatedMember);
+                    showMessageBox('Thành viên đã được cập nhật thành công!');
+                } else {
+                    // Add new member
+                    const newMember = {
+                        _id: generateUniqueId('M-'),
+                        name: memberName,
+                        role: memberRole,
+                        email: memberEmail
+                    };
+                    await db_team.put(newMember);
+                    showMessageBox('Thành viên mới đã được thêm thành công!');
+                }
+                await loadTeamFromPouchDB(); // Reload all members after modify
+                closeModal('teamModal');
+            } catch (err) {
+                console.error('Lỗi khi lưu thành viên:', err);
+                showMessageBox('Lỗi khi lưu thành viên. Vui lòng kiểm tra console.');
+            }
+        }
+
+        /**
+         * Populates the team member modal with existing data for editing.
+         * @param {string} id - The _id of the team member to edit.
+         */
+        async function editTeamMember(id) {
+            try {
+                const member = await db_team.get(id);
+                document.getElementById('teamModalTitle').textContent = 'Sửa Thành viên';
+                document.getElementById('memberId').value = member._id;
+                document.getElementById('memberName').value = member.name;
+                document.getElementById('memberRole').value = member.role;
+                document.getElementById('memberEmail').value = member.email;
+                openModal('teamModal');
+            } catch (err) {
+                console.error('Lỗi khi tải thành viên để sửa:', err);
+                showMessageBox('Không thể tải thành viên để sửa.');
+            }
+        }
+
+        /**
+         * Deletes a team member using PouchDB.
+         * @param {string} id - The _id of the team member to delete.
+         */
+        async function deleteTeamMember(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa thành viên này không?')) {
+                try {
+                    const doc = await db_team.get(id);
+                    await db_team.remove(doc);
+                    showMessageBox('Thành viên đã được xóa.');
+
+                    // Also update any assigned tasks/issues where this member was assigned
+                    await loadTasksFromPouchDB(); // Reload tasks to update assignedTo
+                    await loadIssuesFromPouchDB(); // Reload issues to update assignedTo
+                    await loadTeamFromPouchDB(); // Finally reload team members
+                } catch (err) {
+                    console.error('Lỗi khi xóa thành viên:', err);
+                    showMessageBox('Lỗi khi xóa thành viên.');
+                }
+            }
+        }
+
+        /**
+         * Populates the 'Assigned To' dropdowns in task and issue modals.
+         * @param {string} selectId - The ID of the select element to populate.
+         */
+        function populateAssignedToDropdown(selectId) {
+            const selectElement = document.getElementById(selectId);
+            // Store current selected value to re-select after update if available
+            const currentAssignedToName = selectElement.value;
+            selectElement.innerHTML = '<option value="">Chọn người phụ trách</option>'; // Clear existing options
+
+            projectData.team.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.name; // Use member name for display and task assignment
+                option.textContent = member.name;
+                selectElement.appendChild(option);
+            });
+            // Try to restore the previously selected value
+            if (currentAssignedToName) {
+                selectElement.value = currentAssignedToName;
+            }
+        }
+
+        // --- Issues/Risks Management ---
+
+        /**
+         * Renders issues and risks into the issues table.
+         */
+        function renderIssues() {
+            const tableBody = document.getElementById('issuesTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            const noIssuesMessage = document.getElementById('noIssuesMessage');
+
+            if (projectData.issues.length === 0) {
+                noIssuesMessage.classList.remove('hidden');
+                return;
+            } else {
+                noIssuesMessage.classList.add('hidden');
+            }
+
+            projectData.issues.forEach(issue => {
+                const row = document.createElement('tr');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <td class="font-semibold">${issue._id}</td>
+                    <td>${issue.type}</td>
+                    <td>${issue.description.substring(0, 50)}...</td>
+                    <td><span class="px-2 py-1 rounded-full text-xs font-medium status-${issue.status.toLowerCase().replace(/\s/g, '-') || 'open'}">${issue.status}</span></td>
+                    <td><span class="px-2 py-1 rounded-full text-xs font-medium priority-${issue.severity.toLowerCase() || 'medium'}">${issue.severity}</span></td>
+                    <td>${issue.assignedTo || 'Chưa gán'}</td>
+                    <td>${issue.dateReported || 'N/A'}</td>
+                    <td class="flex space-x-2">
+                        <button onclick="editIssue('${issue._id}')" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">Sửa</button>
+                        <button onclick="deleteIssue('${issue._id}')" class="text-red-600 hover:text-red-900 text-sm font-medium">Xóa</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        /**
+         * Handles adding or updating an issue/risk using PouchDB.
+         * @param {Event} event - The form submission event.
+         */
+        async function handleIssueFormSubmit(event) {
+            event.preventDefault();
+
+            const issueId = document.getElementById('issueId').value; // This is _id for PouchDB
+            const issueType = document.getElementById('issueType').value;
+            const issueDescription = document.getElementById('issueDescription').value;
+            const issueStatus = document.getElementById('issueStatus').value;
+            const issueSeverity = document.getElementById('issueSeverity').value;
+            const issueAssignedTo = document.getElementById('issueAssignedTo').value;
+            const issueDateReported = document.getElementById('issueDateReported').value;
+            const issueResolution = document.getElementById('issueResolution').value;
+
+            try {
+                if (issueId) {
+                    // Update existing issue
+                    const doc = await db_issues.get(issueId);
+                    const updatedIssue = {
+                        _id: doc._id,
+                        _rev: doc._rev,
+                        type: issueType,
+                        description: issueDescription,
+                        status: issueStatus,
+                        severity: issueSeverity,
+                        assignedTo: issueAssignedTo,
+                        dateReported: issueDateReported,
+                        resolution: issueResolution
+                    };
+                    await db_issues.put(updatedIssue);
+                    showMessageBox('Vấn đề/Rủi ro đã được cập nhật thành công!');
+                } else {
+                    // Add new issue
+                    const newIssue = {
+                        _id: generateUniqueId('I-'),
+                        type: issueType,
+                        description: issueDescription,
+                        status: issueStatus,
+                        severity: issueSeverity,
+                        assignedTo: issueAssignedTo,
+                        dateReported: issueDateReported,
+                        resolution: issueResolution
+                    };
+                    await db_issues.put(newIssue);
+                    showMessageBox('Vấn đề/Rủi ro mới đã được thêm thành công!');
+                }
+                await loadIssuesFromPouchDB(); // Reload all issues after modify
+                closeModal('issueModal');
+            } catch (err) {
+                console.error('Lỗi khi lưu vấn đề/rủi ro:', err);
+                showMessageBox('Lỗi khi lưu vấn đề/rủi ro. Vui lòng kiểm tra console.');
+            }
+        }
+
+        /**
+         * Populates the issue modal with existing issue data for editing.
+         * @param {string} id - The _id of the issue to edit.
+         */
+        async function editIssue(id) {
+            try {
+                const issue = await db_issues.get(id);
+                document.getElementById('issueModalTitle').textContent = 'Sửa Vấn đề/Rủi ro';
+                document.getElementById('issueId').value = issue._id;
+                document.getElementById('issueType').value = issue.type;
+                document.getElementById('issueDescription').value = issue.description;
+                document.getElementById('issueStatus').value = issue.status;
+                document.getElementById('issueSeverity').value = issue.severity;
+                document.getElementById('issueAssignedTo').value = issue.assignedTo;
+                document.getElementById('issueDateReported').value = issue.dateReported;
+                document.getElementById('issueResolution').value = issue.resolution;
+                populateAssignedToDropdown('issueAssignedTo'); // Ensure dropdown is populated before setting value
+                openModal('issueModal');
+            } catch (err) {
+                console.error('Lỗi khi tải vấn đề/rủi ro để sửa:', err);
+                showMessageBox('Không thể tải vấn đề/rủi ro để sửa.');
+            }
+        }
+
+        /**
+         * Deletes an issue/risk using PouchDB.
+         * @param {string} id - The _id of the issue/risk to delete.
+         */
+        async function deleteIssue(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa vấn đề/rủi ro này không?')) {
+                try {
+                    const doc = await db_issues.get(id);
+                    await db_issues.remove(doc);
+                    showMessageBox('Vấn đề/Rủi ro đã được xóa.');
+                    await loadIssuesFromPouchDB(); // Reload all issues after delete
+                } catch (err) {
+                    console.error('Lỗi khi xóa vấn đề/rủi ro:', err);
+                    showMessageBox('Lỗi khi xóa vấn đề/rủi ro.');
+                }
+            }
+        }
+
+        // --- Dashboard Updates ---
+
+        /**
+         * Updates the dashboard summary statistics.
+         */
+        function updateDashboard() {
+            const totalTasks = projectData.tasks.length;
+            const todoTasks = projectData.tasks.filter(task => task.status === 'To Do').length;
+            const inProgressTasks = projectData.tasks.filter(task => task.status === 'In Progress').length;
+            const doneTasks = projectData.tasks.filter(task => task.status === 'Done').length;
+
+            document.getElementById('totalTasks').textContent = totalTasks;
+            document.getElementById('todoTasks').textContent = todoTasks;
+            document.getElementById('inProgressTasks').textContent = inProgressTasks;
+            document.getElementById('doneTasks').textContent = doneTasks;
+
+            const openIssues = projectData.issues.filter(issue => issue.status === 'Open' || issue.status === 'In Progress');
+            const openIssuesSummaryDiv = document.getElementById('openIssuesSummary');
+            openIssuesSummaryDiv.innerHTML = ''; // Clear previous content
+
+            if (openIssues.length === 0) {
+                openIssuesSummaryDiv.innerHTML = '<p class="text-gray-600">Không có vấn đề/rủi ro đang mở.</p>';
+            } else {
+                const ul = document.createElement('ul');
+                ul.className = 'list-disc list-inside text-gray-700';
+                openIssues.forEach(issue => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="font-semibold">${issue._id} (${issue.type}):</span> ${issue.description} <span class="text-sm text-gray-500">(${issue.status}, ${issue.severity})</span>`;
+                    ul.appendChild(li);
+                });
+                openIssuesSummaryDiv.appendChild(ul);
+            }
+        }
+
+        // --- Export to CSV Functions ---
+
+        /**
+         * Converts an array of objects to CSV format.
+         * @param {Array<Object>} data - The array of objects to convert.
+         * @param {Array<string>} headers - An array of strings representing the desired CSV headers.
+         * @param {Array<string>} keys - An array of strings representing the keys in the data objects corresponding to the headers.
+         * @returns {string} The CSV formatted string.
+         */
+        function convertToCSV(data, headers, keys) {
+            let csv = headers.join(',') + '\n'; // Add headers
+            data.forEach(row => {
+                const values = keys.map(key => {
+                    let value = row[key] === undefined || row[key] === null ? '' : String(row[key]);
+                    // Handle values that contain commas, double quotes, or newlines by enclosing them in double quotes
+                    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\n';
+            });
+            return csv;
+        }
+
+        /**
+         * Downloads a string as a CSV file.
+         * @param {string} csvString - The CSV content.
+         * @param {string} filename - The name of the file to download.
+         */
+        function downloadCSV(csvString, filename) {
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) { // Feature detection for download attribute
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showMessageBox(`Đã xuất dữ liệu "${filename}" thành công!`);
+            } else {
+                showMessageBox('Trình duyệt của bạn không hỗ trợ tải xuống file trực tiếp. Vui lòng sao chép nội dung CSV.');
+            }
+        }
+
+        /**
+         * Exports tasks data to a CSV file.
+         */
+        function exportTasksToCSV() {
+            // Note: Use _id for internal PouchDB ID, but you might want to use another field for user-facing ID if you have one.
+            // For simplicity here, we're using _id as the primary displayed ID.
+            const headers = ['ID', 'Tên Công việc', 'Mô tả', 'Ưu tiên', 'Trạng thái', 'Người phụ trách', 'Ngày bắt đầu', 'Ngày đến hạn', 'Giờ ước tính', 'Giờ thực tế', 'Tiến độ (%)', 'ID Công việc cha', 'Phụ thuộc vào', 'Liên kết tài liệu'];
+            const keys = ['_id', 'name', 'description', 'priority', 'status', 'assignedTo', 'startDate', 'dueDate', 'estimatedHours', 'actualHours', 'progress', 'parentId', 'dependencies', 'link'];
+            const csv = convertToCSV(projectData.tasks, headers, keys);
+            downloadCSV(csv, 'tasks_tracking.csv');
+        }
+
+        /**
+         * Exports team data to a CSV file.
+         */
+        function exportTeamToCSV() {
+            const headers = ['ID Thành viên', 'Tên', 'Vai trò', 'Email'];
+            const keys = ['_id', 'name', 'role', 'email'];
+            const csv = convertToCSV(projectData.team, headers, keys);
+            downloadCSV(csv, 'team_members.csv');
+        }
+
+        /**
+         * Exports issues/risks data to a CSV file.
+         */
+        function exportIssuesToCSV() {
+            const headers = ['ID', 'Loại', 'Mô tả', 'Trạng thái', 'Mức độ nghiêm trọng/tác động', 'Người phụ trách', 'Ngày báo cáo', 'Kế hoạch giải quyết/giảm thiểu'];
+            const keys = ['_id', 'type', 'description', 'status', 'severity', 'assignedTo', 'dateReported', 'resolution'];
+            const csv = convertToCSV(projectData.issues, headers, keys);
+            downloadCSV(csv, 'issues_risks.csv');
+        }
+
+        // --- Initial Load Functions ---
+
+        /**
+         * Loads all tasks from PouchDB and updates projectData.tasks.
+         */
+        async function loadTasksFromPouchDB() {
+            try {
+                const result = await db_tasks.allDocs({ include_docs: true });
+                projectData.tasks = result.rows.map(row => row.doc);
+                renderTasks();
+                updateDashboard();
+            } catch (err) {
+                console.error('Lỗi khi tải công việc từ PouchDB:', err);
+                showMessageBox('Lỗi khi tải công việc.');
+            }
+        }
+
+        /**
+         * Loads all team members from PouchDB and updates projectData.team.
+         */
+        async function loadTeamFromPouchDB() {
+            try {
+                const result = await db_team.allDocs({ include_docs: true });
+                projectData.team = result.rows.map(row => row.doc);
+                renderTeamMembers();
+                populateAssignedToDropdown('taskAssignedTo'); // Update assignedTo dropdowns
+                populateAssignedToDropdown('issueAssignedTo');
+            } catch (err) {
+                console.error('Lỗi khi tải thành viên đội ngũ từ PouchDB:', err);
+                showMessageBox('Lỗi khi tải thành viên đội ngũ.');
+            }
+        }
+
+        /**
+         * Loads all issues from PouchDB and updates projectData.issues.
+         */
+        async function loadIssuesFromPouchDB() {
+            try {
+                const result = await db_issues.allDocs({ include_docs: true });
+                projectData.issues = result.rows.map(row => row.doc);
+                renderIssues();
+                updateDashboard();
+            } catch (err) {
+                console.error('Lỗi khi tải vấn đề/rủi ro từ PouchDB:', err);
+                showMessageBox('Lỗi khi tải vấn đề/rủi ro.');
+            }
+        }
+
+
+        // --- Event Listeners and Initial Load ---
+
+        window.onload = async function() {
+            // Set default date for issueDateReported to today
+            document.getElementById('issueDateReported').valueAsDate = new Date();
+
+            // Load all data from PouchDB initially
+            // Load team first as tasks/issues depend on it for dropdowns
+            await loadTeamFromPouchDB();
+            await loadTasksFromPouchDB();
+            await loadIssuesFromPouchDB();
+
+
+            // Event Listeners for Tab Buttons
+            document.getElementById('dashboardTabBtn').addEventListener('click', () => showSection('dashboardSection'));
+            document.getElementById('tasksTabBtn').addEventListener('click', () => showSection('tasksSection'));
+            document.getElementById('teamTabBtn').addEventListener('click', () => showSection('teamSection'));
+            document.getElementById('issuesTabBtn').addEventListener('click', () => showSection('issuesSection'));
+
+            // Event Listeners for Add Buttons
+            document.getElementById('addTaskBtn').addEventListener('click', () => {
+                document.getElementById('taskForm').reset(); // Clear form on add
+                document.getElementById('taskId').value = ''; // Ensure no ID is set for new task
+                document.getElementById('taskModalTitle').textContent = 'Thêm Công việc Mới';
+                populateAssignedToDropdown('taskAssignedTo'); // Populate dropdown before opening
+                openModal('taskModal');
+            });
+            document.getElementById('addTeamMemberBtn').addEventListener('click', () => {
+                document.getElementById('teamForm').reset(); // Clear form on add
+                document.getElementById('memberId').value = ''; // Ensure no ID is set for new member
+                document.getElementById('teamModalTitle').textContent = 'Thêm Thành viên Mới';
+                openModal('teamModal');
+            });
+            document.getElementById('addIssueBtn').addEventListener('click', () => {
+                document.getElementById('issueForm').reset(); // Clear form on add
+                document.getElementById('issueId').value = ''; // Ensure no ID is set for new issue
+                document.getElementById('issueModalTitle').textContent = 'Thêm Vấn đề/Rủi ro Mới';
+                document.getElementById('issueDateReported').valueAsDate = new Date(); // Set today's date
+                populateAssignedToDropdown('issueAssignedTo'); // Populate dropdown before opening
+                openModal('issueModal');
+            });
+
+            // Event Listeners for Export Buttons
+            document.getElementById('exportTasksBtn').addEventListener('click', exportTasksToCSV);
+            document.getElementById('exportTeamBtn').addEventListener('click', exportTeamToCSV);
+            document.getElementById('exportIssuesBtn').addEventListener('click', exportIssuesToCSV);
+
+            // Event Listeners for Forms
+            document.getElementById('taskForm').addEventListener('submit', handleTaskFormSubmit);
+            document.getElementById('teamForm').addEventListener('submit', handleTeamFormSubmit);
+            document.getElementById('issueForm').addEventListener('submit', handleIssueFormSubmit);
+
+            // Initial rendering based on the default active tab (Dashboard)
+            showSection('dashboardSection');
+        };
+    </script>
+</body>
+</html>
