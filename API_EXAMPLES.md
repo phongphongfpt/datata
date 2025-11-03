@@ -100,7 +100,7 @@ curl -X DELETE http://localhost:8080/api/r2/delete/examples/test.txt
 
 Expected Response:
 ```
-File deleted successfully: examples/test.txt
+File deleted successfully
 ```
 
 ## Example 7: Upload Multiple Files

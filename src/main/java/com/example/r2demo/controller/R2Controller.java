@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
 
@@ -78,10 +79,16 @@ public class R2Controller {
      * @param key The file key/path
      * @return The file as a download
      */
-    @GetMapping("/download/{key}")
-    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String key) {
+    @GetMapping("/download/**")
+    public ResponseEntity<InputStreamResource> downloadFile(HttpServletRequest request) {
+        String key = request.getRequestURI().split("/api/r2/download/", 2)[1];
         try {
             logger.info("Received download request for file: {}", key);
+            
+            // Validate key - prevent null or empty keys
+            if (key == null || key.trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
             
             if (!r2Service.fileExists(key)) {
                 return ResponseEntity.notFound().build();
@@ -128,22 +135,28 @@ public class R2Controller {
      * @param key The file key/path to delete
      * @return Success message
      */
-    @DeleteMapping("/delete/{key}")
-    public ResponseEntity<String> deleteFile(@PathVariable String key) {
+    @DeleteMapping("/delete/**")
+    public ResponseEntity<String> deleteFile(HttpServletRequest request) {
+        String key = request.getRequestURI().split("/api/r2/delete/", 2)[1];
         try {
             logger.info("Received delete request for file: {}", key);
+            
+            // Validate key - prevent null or empty keys
+            if (key == null || key.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Invalid file key");
+            }
             
             if (!r2Service.fileExists(key)) {
                 return ResponseEntity.notFound().build();
             }
             
             r2Service.deleteFile(key);
-            return ResponseEntity.ok("File deleted successfully: " + key);
+            return ResponseEntity.ok("File deleted successfully");
             
         } catch (Exception e) {
             logger.error("Error deleting file: {}", key, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error deleting file: " + e.getMessage());
+                    .body("Error deleting file");
         }
     }
 
@@ -153,10 +166,17 @@ public class R2Controller {
      * @param key The file key/path to check
      * @return Boolean indicating if file exists
      */
-    @GetMapping("/exists/{key}")
-    public ResponseEntity<Boolean> fileExists(@PathVariable String key) {
+    @GetMapping("/exists/**")
+    public ResponseEntity<Boolean> fileExists(HttpServletRequest request) {
+        String key = request.getRequestURI().split("/api/r2/exists/", 2)[1];
         try {
             logger.info("Received exists check for file: {}", key);
+            
+            // Validate key - prevent null or empty keys
+            if (key == null || key.trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
             boolean exists = r2Service.fileExists(key);
             return ResponseEntity.ok(exists);
         } catch (Exception e) {

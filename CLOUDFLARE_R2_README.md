@@ -184,7 +184,7 @@ curl -X DELETE http://localhost:8080/api/r2/delete/documents/myfile.pdf
 
 **Response:**
 ```
-File deleted successfully: documents/myfile.pdf
+File deleted successfully
 ```
 
 ### 5. Check File Existence
@@ -232,6 +232,8 @@ curl http://localhost:8080/api/r2/exists/test-files/test.txt
 ```bash
 curl -X DELETE http://localhost:8080/api/r2/delete/test-files/test.txt
 ```
+
+**Note:** The API supports file keys with nested paths (e.g., `folder/subfolder/file.txt`). The wildcard pattern `**` in the endpoints allows for full path support.
 
 ### Using Postman
 
