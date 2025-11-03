@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# Cloudflare R2 Configuration
+cloudflare:
+  r2:
+    # Your Cloudflare Account ID
+    account-id: YOUR_ACCOUNT_ID
+    # R2 Access Key ID (from R2 API tokens)
+    access-key-id: YOUR_ACCESS_KEY_ID
+    # R2 Secret Access Key (from R2 API tokens)
+    secret-access-key: YOUR_SECRET_ACCESS_KEY
+    # Your R2 bucket name
+    bucket-name: YOUR_BUCKET_NAME
+    # R2 endpoint format: https://<account-id>.r2.cloudflarestorage.com
+    endpoint: https://${cloudflare.r2.account-id}.r2.cloudflarestorage.com
+    # Region can be auto (R2 is region-agnostic)
+    region: auto
+
+logging:
+  level:
+    com.example.r2demo: DEBUG
+    software.amazon.awssdk: INFO
